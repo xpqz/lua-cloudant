@@ -66,8 +66,12 @@ end
 
 -- The CouchDB API --
 
-function Cloudant:get(args)
-  return self:request('GET', self:url(args.docid), nil, nil)
+function Cloudant:get(docid, options)
+  return self:request('GET', self:url(docid), options, nil)
+end
+
+function Cloudant:create(body, options) 
+  return self:request('POST', self:url('_bulk_docs'), options, {docs={body}})
 end
 
 return Cloudant

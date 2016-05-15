@@ -11,7 +11,7 @@ function urlencode(str)
 end
 
 function paramencode(params)
-  if params and params != {} then 
+  if params then 
     local data = {}
     for key, value in pairs(params) do
       data[#data+1] = urlencode(key) .. '=' .. urlencode(value)
