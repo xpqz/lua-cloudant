@@ -28,13 +28,6 @@ function URI:new(tbl)
   return tbl
 end
 
-function URI:scheme(scheme)
-  if not scheme then
-    return self.scheme
-  end
-  self.scheme = scheme
-end
-
 function URI:stringify(relative, params)
   local auth = ''
   local path = self.path
@@ -42,8 +35,7 @@ function URI:stringify(relative, params)
   if relative then
     path = self.path .. '/' .. relative
   end
-  if self.user and self.password then auth = string.format("%s:%s@", self.user, self.password) end
-  return string.format("%s://%s%s/%s%s", self.scheme, auth, self.host, path, par)
+  return string.format("%s://%s%s%s", self.scheme, self.host, path, par)
 end
 
 return URI

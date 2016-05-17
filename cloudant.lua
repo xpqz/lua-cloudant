@@ -7,8 +7,6 @@ local URI = require("uri")
 
 local Cloudant = { baseuri = nil }
 
--- headers = { authentication = "Basic " .. (mime.b64("fulano:silva")) }
-
 function dump(o)
   if type(o) == 'table' then
     local s = '{ '
@@ -28,13 +26,16 @@ function Cloudant:new(tbl)
 
   self.__index = self
 
+  assert(tbl.user)
+  assert(tbl.password)
+
   self.baseuri = URI:new {
     scheme = 'https',
     host = assert(tbl.host),
-    user = assert(tbl.user),
-    password = assert(tbl.password),
-    path = '/'
+    path = ''
   }
+
+  self.auth = "Basic " .. (mime.b64(string.format("%s:%s", tbl.user, tbl.password))) 
 
   return tbl
 end
@@ -53,15 +54,42 @@ end
 
 function Cloudant:request(method, url, params, data)
   local response_body = {}
-  local req = { url = url, method = method, sink = ltn12.sink.table(response_body) }
+  local req = { 
+    url = url, 
+    method = method, 
+    sink = ltn12.sink.table(response_body), 
+    headers = self.cookie and {['Cookie'] = self.cookie} or {['Authorization'] = self.auth}
+  }
+
   if data then
     local jsonData = json.stringify(data)
     req.source = ltn12.source.string(jsonData)
-    req.headers = { ["Content-Type"] = "application/json", ["Content-Length"] = jsonData:len() }
+    req.headers['Content-Type'] = 'application/json'
+    req.headers['Content-Length'] = jsonData:len()
   end
+
+  -- print(dump(req))
 
   local res, httpStatus, responseHeaders, status = http.request(req)
   return json.parse(table.concat(response_body))  
+end
+
+function Cloudant:authenticate()
+  local response_body = {}
+  local authdata = string.format('name=%s&password=%s', self.user, self.password)
+  
+  local req = { 
+    url = self:instanceurl('_session'), 
+    method = 'POST', 
+    source = ltn12.source.string(authdata),
+    sink = ltn12.sink.table(response_body),
+    headers = {
+      ['Content-Length'] = authdata:len(), 
+      ['Content-Type']   = 'application/x-www-form-urlencoded'
+    }
+  }
+  local res, httpStatus, responseHeaders, status = http.request(req)
+  self.cookie = responseHeaders['set-cookie']
 end
 
 -- The CouchDB document API --
