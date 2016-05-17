@@ -1,49 +1,13 @@
-https://gist.github.com/tylerneylon/59f4bcf316be525b30ab
+## Lua-Cloudant
 
-```lua
-local url = "http://127.0.0.1:8000/api/getstrings/"
-local body = "message=getstrings"
-local headers = {
-    ["content-length"] = body:len(),
-    ["Content-Type"] = "application/x-www-form-urlencoded"
-  }
+Cloudant = require "cloudant"
 
-local response = {}
-local r, c, h = http.request{
-  url= url,
-  method = "POST",
-  headers = headers,
-  source = ltn12.source.string(body),
-  sink = ltn12.sink.table(response)
+cdt = Cloudant:new{user="...", password="...", host="ABC.cloudant.com"}
+cdt:database("database")
 
-}
-```
+doc = cdt:read("0FF068B8-C082-9BA0-9E02-DF2340BDB1E3", {rev= "1-25f742e015dd334b7525f42a49e38df5"})
+res = cdt:create{hello="world"}
 
-```lua
-local http = require("socket.http")
-local ltn12 = require("ltn12")
+res = cdt:update("0FF068B8-C082-9BA0-9E02-DF2340BDB1E3", "1-25f742e015dd334b7525f42a49e38df5", {hello="the audience"})
 
--- The Request Bin test URL: http://requestb.in/12j0kaq1
-function sendRequest()
-local path = "http://requestb.in/12j0kaq1?param_1=one&param_2=two&param_3=three"
-  local payload = [[ {"key":"My Key","name":"My Name","description":"The description","state":1} ]]
-  local response_body = { }
-
-  local res, code, response_headers, status = http.request
-  {
-    url = path,
-    method = "POST",
-    headers =
-    {
-      ["Authorization"] = "Maybe you need an Authorization header?", 
-      ["Content-Type"] = "application/json",
-      ["Content-Length"] = payload:len()
-    },
-    source = ltn12.source.string(payload),
-    sink = ltn12.sink.table(response_body)
-  }
-  luup.task('Response: = ' .. table.concat(response_body) .. ' code = ' .. code .. '   status = ' .. status,1,'Sample POST request with JSON data',-1)
-end
-```
-http://w3.impa.br/~diego/software/luasocket/ltn12.html
 

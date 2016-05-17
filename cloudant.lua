@@ -40,11 +40,11 @@ function Cloudant:new(tbl)
 end
 
 function Cloudant:database(name)
-  self.database = assert(name)
+  self.dbname = assert(name)
 end
 
 function Cloudant:url(endpoint)
-  return self.baseuri:stringify(self.database .. '/' .. endpoint)
+  return self.baseuri:stringify(self.dbname .. '/' .. endpoint)
 end
 
 function Cloudant:instanceurl(endpoint)
@@ -64,14 +64,60 @@ function Cloudant:request(method, url, params, data)
   return json.parse(table.concat(response_body))  
 end
 
--- The CouchDB API --
+-- The CouchDB document API --
 
-function Cloudant:get(docid, options)
+function Cloudant:bulkdocs(data, options)
+  return self:request('POST', self:url('_bulk_docs'), options, {docs=data})
+end
+
+function Cloudant:read(docid, options)
   return self:request('GET', self:url(docid), options, nil)
 end
 
 function Cloudant:create(body, options) 
-  return self:request('POST', self:url('_bulk_docs'), options, {docs={body}})
+  local data = self:bulkdocs({body}, options)
+  return data[1]
 end
+
+function Cloudant:update(docid, revid, body, options)
+  body._id = docid
+  body._rev = revid
+  local data = self:bulkdocs({body}, options)
+  return data[1]
+end
+
+function Cloudant:delete(docid, revid)
+ local data = self:bulkdocs({{_id=docid, _rev=revid, _deleted=true}}, nil)
+ return data[1]
+end
+
+function Cloudant:alldocs(options)
+    return self:request('GET', self:url('_all_docs'), options, nil)
+end
+
+-- The CouchDB instance API --
+
+function Cloudant:createdb()
+  return self:request('PUT', self:instanceurl(self.dbname), nil, nil)
+end
+
+function Cloudant:dbinfo()
+  return self:request('GET', self:instanceurl(self.dbname), nil, nil)
+end
+
+function Cloudant:deletedb()
+  return self:request('DELETE', self:instanceurl(self.dbname), nil, nil)
+end
+
+function Cloudant:listdbs()
+  return self:request('GET', self:instanceurl(''), nil, nil)
+end
+
+-- The CouchDB replication API --
+
+function Cloudant:changes(options)
+    return self:request('GET', self:url('_changes'), options, nil)
+end
+
 
 return Cloudant
