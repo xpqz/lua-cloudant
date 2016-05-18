@@ -76,7 +76,7 @@ end
 
 function Cloudant:authenticate()
   local response_body = {}
-  local authdata = string.format('name=%s&password=%s', self.user, self.password)
+  local authdata = string.format('name=%s&password=%s', urlencode(self.user), urlencode(self.password))
   
   local req = { 
     url = self:instanceurl('_session'), 
