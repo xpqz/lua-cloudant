@@ -1,23 +1,19 @@
 
-local http = require("socket.http")
-local ltn12 = require("ltn12")
-local json = require("json")
-local mime = require("mime")
-local URI = require("uri")
+local request = require 'http.request'
+local json = require 'cjson'
+local mime = require 'mime'
+local URI = require 'uri'
 
 local Cloudant = { baseuri = nil }
 
-function dump(o)
-  if type(o) == 'table' then
-    local s = '{ '
-    for k,v in pairs(o) do
-      if type(k) ~= 'number' then k = '"'..k..'"' end
-      s = s .. '['..k..'] = ' .. dump(v) .. ','
-    end
-    return s .. '} '
-  else
-    return tostring(o)
-  end
+local function urlencode(str)
+   if (str) then
+      str = string.gsub (str, "\n", "\r\n")
+      str = string.gsub (str, "([^%w ])",
+         function (c) return string.format ("%%%02X", string.byte(c)) end)
+      str = string.gsub (str, " ", "+")
+   end
+   return str    
 end
 
 function Cloudant:new(tbl) 
@@ -35,7 +31,7 @@ function Cloudant:new(tbl)
     path = ''
   }
 
-  self.auth = "Basic " .. (mime.b64(string.format("%s:%s", tbl.user, tbl.password))) 
+  self.auth = 'Basic ' .. mime.b64(string.format('%s:%s', tbl.user, tbl.password))
 
   return tbl
 end
@@ -53,53 +49,43 @@ function Cloudant:instanceurl(endpoint)
 end
 
 function Cloudant:request(method, url, params, data)
-  local response_body = {}
-  local req = { 
-    url = url, 
-    method = method, 
-    sink = ltn12.sink.table(response_body), 
-    headers = self.cookie and {['Cookie'] = self.cookie} or {['Authorization'] = self.auth}
-  }
-
+  local req = request.new_from_uri(url)
+  req.headers:upsert(':method', method)
   if data then
-    local jsonData = json.stringify(data)
-    req.source = ltn12.source.string(jsonData)
-    req.headers['Content-Type'] = 'application/json'
-    req.headers['Content-Length'] = jsonData:len()
+    req.headers:append('content-type', 'application/json')
+    req:set_body(json.encode(data))
+  end
+  if self.cookie then
+    req.headers:append('cookie', self.cookie)
+  else -- fallback on basic
+    req.headers:append('Authorization', self.auth)
   end
 
-  -- print(dump(req))
-
-  local res, httpStatus, responseHeaders, status = http.request(req)
-  return json.parse(table.concat(response_body))  
+  return req:go()
 end
 
 function Cloudant:authenticate()
-  local response_body = {}
+  local req = request.new_from_uri(self:instanceurl('_session'))
   local authdata = string.format('name=%s&password=%s', urlencode(self.user), urlencode(self.password))
+  req.headers:upsert(':method', 'POST')
+  req.headers:append('content-type', 'application/x-www-form-urlencoded')
+  req:set_body(authdata)
+  local headers, stream = req:go()
+  self.cookie = headers:get('set-cookie')
+end
   
-  local req = { 
-    url = self:instanceurl('_session'), 
-    method = 'POST', 
-    source = ltn12.source.string(authdata),
-    sink = ltn12.sink.table(response_body),
-    headers = {
-      ['Content-Length'] = authdata:len(), 
-      ['Content-Type']   = 'application/x-www-form-urlencoded'
-    }
-  }
-  local res, httpStatus, responseHeaders, status = http.request(req)
-  self.cookie = responseHeaders['set-cookie']
+local function body(headers, stream)
+  return json.decode(stream:get_body_as_string())
 end
 
 -- The CouchDB document API --
 
 function Cloudant:bulkdocs(data, options)
-  return self:request('POST', self:url('_bulk_docs'), options, {docs=data})
+  return body(self:request('POST', self:url('_bulk_docs'), options, {docs=data}))
 end
 
 function Cloudant:read(docid, options)
-  return self:request('GET', self:url(docid), options, nil)
+  return body(self:request('GET', self:url(docid), options, nil))
 end
 
 function Cloudant:create(body, options) 
@@ -120,25 +106,25 @@ function Cloudant:delete(docid, revid)
 end
 
 function Cloudant:alldocs(options)
-    return self:request('GET', self:url('_all_docs'), options, nil)
+    return body(self:request('GET', self:url('_all_docs'), options, nil))
 end
 
 -- The CouchDB instance API --
 
 function Cloudant:createdb()
-  return self:request('PUT', self:instanceurl(self.dbname), nil, nil)
+  return body(self:request('PUT', self:instanceurl(self.dbname), nil, nil))
 end
 
 function Cloudant:dbinfo()
-  return self:request('GET', self:instanceurl(self.dbname), nil, nil)
+  return body(self:request('GET', self:instanceurl(self.dbname), nil, nil))
 end
 
 function Cloudant:deletedb()
-  return self:request('DELETE', self:instanceurl(self.dbname), nil, nil)
+  return body(self:request('DELETE', self:instanceurl(self.dbname), nil, nil))
 end
 
 function Cloudant:listdbs()
-  return self:request('GET', self:instanceurl(''), nil, nil)
+  return body(self:request('GET', self:instanceurl(''), nil, nil))
 end
 
 -- The CouchDB replication API --

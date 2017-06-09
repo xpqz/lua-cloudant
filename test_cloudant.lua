@@ -1,14 +1,11 @@
-luaunit = require 'luaunit'
+local luaunit = require 'luaunit'
+local Cloudant = require 'cloudant'
 
-Cloudant = require 'cloudant'
+local user = os.getenv 'CLOUDANT_USER'
+local password = os.getenv 'CLOUDANT_PASSWORD'
+local host = os.getenv 'CLOUDANT_HOST'
 
-user = os.getenv 'CLOUDANT_USER'
-password = os.getenv 'CLOUDANT_PASSWORD'
-host = os.getenv 'CLOUDANT_HOST'
-
-print(user, password, host)
-
-cdt = Cloudant:new{user=user, password=password, host=host}
+local cdt = Cloudant:new{user=user, password=password, host=host}
 cdt:authenticate() -- cookie auth
 
 TestCRUD = {}
@@ -23,7 +20,6 @@ TestCRUD = {}
 
   function TestCRUD:testCreateDocument()
     status = cdt:create{hello='world'}
-    print(dump(status))
     luaunit.assertNotNil(status.id)
     luaunit.assertNotNil(status.rev)
   end
@@ -31,7 +27,6 @@ TestCRUD = {}
   function TestCRUD:testReadDocument() -- NOTE: reading writes not a good idea!
     status = cdt:create{hello='read'}
     doc = cdt:read(status.id, {rev=status.rev})
-    print(dump(doc))
     luaunit.assertEquals(status.id, doc._id)
     luaunit.assertEquals(status.rev, doc._rev)
     luaunit.assertEquals(doc.hello, 'read')

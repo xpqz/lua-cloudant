@@ -1,25 +1,6 @@
+local util = require 'http.util'
+
 local URI = {}
-
-function urlencode(str)
-   if (str) then
-      str = string.gsub (str, "\n", "\r\n")
-      str = string.gsub (str, "([^%w ])",
-         function (c) return string.format ("%%%02X", string.byte(c)) end)
-      str = string.gsub (str, " ", "+")
-   end
-   return str    
-end
-
-function paramencode(params)
-  if params then 
-    local data = {}
-    for key, value in pairs(params) do
-      data[#data+1] = urlencode(key) .. '=' .. urlencode(value)
-    end
-    return '?' .. table.concat(data, '&')
-  end
-  return ''
-end
 
 function URI:new(tbl) 
   tbl = tbl or {}
@@ -29,9 +10,9 @@ function URI:new(tbl)
 end
 
 function URI:stringify(relative, params)
-  local auth = ''
   local path = self.path
-  local par = paramencode(params)
+  local par = ''
+  if params then util.dict_to_query(params) end
   if relative then
     path = self.path .. '/' .. relative
   end
